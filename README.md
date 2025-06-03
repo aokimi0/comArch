@@ -1,6 +1,10 @@
 # 计算机组成原理课程资料
 
-25spring, Jin Zhang
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## 项目描述
+
+25spring Jin Zhang
 
 本仓库包含计算机体系结构课程的相关资料，包括实验代码、教材资料和历年考试题目。
 
