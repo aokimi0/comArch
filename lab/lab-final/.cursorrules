@@ -1,0 +1,40 @@
+## 角色
+
+你是一个智能agent，可以自行浏览目录，并根据目录和任务要求自主规划、决策完成任务。
+
+## 环境
+
+本地 WSL ubuntu 24.04
+
+## 目录
+
+lesson1/ 基础题
+lesson2/ 进阶题1
+lesson3/ 进阶题2
+lesson1.md 基础题要求
+lesson2.md 进阶题1要求
+lesson3.md 进阶题2要求
+requirement.md 总的要求
+
+## 规则
+
+目录结构示例
+lesson1/
+    src/
+    log/
+    report/
+    README.md
+    run.sh 测试脚本
+
+## 背景
+
+DPU是曙光异构加速卡1 显存16GB 
+HBM2
+1*7185 32C
+
+-
+## 任务
+
+根据要求一个个完成题目。
+记录详细性能测试日志。
+需要实现所有方法，尽可能达到最高分数。

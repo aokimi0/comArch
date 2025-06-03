@@ -1,0 +1,12 @@
+0.6
+2019.2
+Nov  6 2019
+21:57:16
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/adder.v,1461905924,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/alu.v,,adder,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/alu.v,1461985380,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/data_ram.v,,alu,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/data_ram.v,1461985414,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/inst_rom.v,,data_ram,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/inst_rom.v,1747146485,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/regfile.v,,inst_rom,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/regfile.v,1461985342,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/single_cycle_cpu.v,,regfile,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/single_cycle_cpu.v,1747147293,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/tb.v,,single_cycle_cpu,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/6_single_cycle_cpu/tb.v,1747147987,verilog,,,,tb,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/lab5.sim/sim_1/behav/xsim/glbl.v,1573089660,verilog,,,,glbl,,,,,,,,

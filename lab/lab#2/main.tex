@@ -1,0 +1,579 @@
+\documentclass[a4paper,colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=green,bookmarks=true]{article}
+
+% 基础宏包
+\usepackage{ctex}              % 中文支持
+\usepackage{graphicx}          % 图片支持
+\usepackage{amsmath}           % 数学公式
+\usepackage{amssymb}          % 数学符号
+\usepackage{geometry}          % 页面设置
+\usepackage{fancyhdr}          % 页眉页脚
+\usepackage{lastpage}          % 获取总页数
+\usepackage{zhnumber}          % 中文数字
+\usepackage{float}             % 浮动体设置
+\usepackage{subcaption}        % 支持子图
+
+% 页面设置
+\geometry{a4paper,top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm}
+
+% 浮动体设置
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+\renewcommand{\floatpagefraction}{0.35}
+\setcounter{topnumber}{5}
+\setcounter{bottomnumber}{5}
+\setcounter{totalnumber}{10}
+
+% 引入样式文件
+\input{style/base}
+\input{style/layout}
+\input{style/fonts}
+\input{style/code}
+
+% 图片路径
+\graphicspath{{fig/}}
+
+% 使用natbib和plainurl风格
+\usepackage[numbers,sort&compress,square,comma]{natbib}
+\bibliographystyle{unsrtnat}
+
+% 自定义参考文献样式
+\makeatletter
+\renewcommand\@biblabel[1]{{\bf [#1]}}
+\def\@cite#1#2{[{#1\if@tempswa , #2\fi}]}
+\renewcommand{\bibfont}{\small}
+\setlength{\bibsep}{1.2ex}
+\makeatother
+
+% 美化URL显示
+\usepackage{xurl}
+\renewcommand{\UrlFont}{\ttfamily\color{blue}\small}
+
+% 伪代码设置
+\usepackage{algorithm}  
+\usepackage{algorithmicx}  
+\usepackage{algpseudocode}  
+\floatname{algorithm}{Algorithm}  
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}  
+\renewcommand{\algorithmicensure}{\textbf{Output:}} 
+\usepackage{lipsum}  
+
+% 定义中英文摘要环境
+\makeatletter
+% 中文摘要环境
+\newenvironment{cnabstract}{
+    \par\small
+    \noindent\mbox{}\par\vspace{-\baselineskip}
+    \par\songti\parindent 2em
+    }
+    {\par\vspace{1em}}
+
+% 英文摘要环境
+\newenvironment{enabstract}{
+    \par\small
+    \noindent\mbox{}\par\vspace{-\baselineskip}
+    \par\parindent 2em
+    }
+    {\par\vspace{1em}}
+\makeatother
+
+\makeatletter
+\providecommand{\breakablealgorithm}{%
+  \begin{center}
+     \refstepcounter{algorithm}%
+     \hrule height.8pt depth0pt \kern2pt%
+     \renewcommand{\caption}[2][\relax]{%
+      {\raggedright\textbf{\ALG@name~\thealgorithm} ##2\par}%
+      \ifx\relax##1\relax
+         \addcontentsline{loa}{algorithm}{\protect\numberline{\thealgorithm}##2}%
+      \else
+         \addcontentsline{loa}{algorithm}{\protect\numberline{\thealgorithm}##1}%
+      \fi
+      \kern2pt\hrule\kern2pt
+     }
+  \end{center}
+}
+\makeatother
+
+%-------------------------页眉页脚--------------
+\pagestyle{fancy}
+\lhead{\kaishu \leftmark}
+\rhead{\kaishu 并行程序设计实验报告}
+\lfoot{}
+\cfoot{\thepage}
+\rfoot{}
+
+%--------------------文档内容--------------------
+
+\begin{document}
+\renewcommand{\contentsname}{目录}
+\renewcommand{\appendixname}{附录}
+\renewcommand{\appendixpagename}{附录}
+\renewcommand{\refname}{参考文献} 
+\renewcommand{\figurename}{图}
+\renewcommand{\tablename}{表}
+\renewcommand{\abstractname}{摘要}
+\renewcommand{\today}{\number\year 年 \number\month 月 \number\day 日}
+
+\renewcommand {\thefigure}{\thesection{}.\arabic{figure}}%图片按章标号
+\renewcommand{\figurename}{图}
+\renewcommand{\contentsname}{目录}  
+\cfoot{\thepage\ of \pageref{LastPage}}%当前页 of 总页数
+
+% 封面
+\begin{titlepage}
+    \begin{center}
+    \includegraphics[width=0.6\textwidth]{NKU.png}\\[1cm]
+    \vspace{20mm}
+		\textbf{\huge\textbf{\kaishu{计算机学院}}}\\[0.5cm]
+		\textbf{\huge{\kaishu{并行程序设计报告}}}\\[2.3cm]
+		\textbf{\Huge\textbf{\kaishu{缓存优化与超标量技术实验报告}}}
+
+		\vspace{\fill}
+    
+    \centering
+    \textsc{\LARGE \kaishu{姓名\ :\ 廖望}}\\[0.5cm]
+    \textsc{\LARGE \kaishu{学号\ :\ 2210556}}\\[0.5cm]
+    \textsc{\LARGE \kaishu{专业\ :\ 计算机科学与技术}}\\[0.5cm]
+    
+    \vfill
+    {\Large \today}
+    \end{center}
+\end{titlepage}
+
+% 中文摘要
+\clearpage
+\phantomsection
+\begin{center}{\zihao{4}\songti\bfseries{摘\quad 要}}\end{center}\par\vspace{0.5em}
+\addcontentsline{toc}{section}{摘要}
+\begin{cnabstract}
+本实验探究缓存优化和超标量技术对程序性能的影响，通过矩阵-向量乘法和数组求和两个问题，分析空间局部性优化和指令级并行度优化在不同指令集架构下的效果差异。实验在x86-64和ARM(aarch64)两种主流指令集架构上进行对比测试，并比较C++和Python实现的性能差异。结果表明：(1)不同指令集架构对优化策略的响应特性各不相同，x86指令集对缓存局部性问题更为敏感，而ARM指令集在指令级并行和递归优化方面表现出独特优势；(2)x86指令集的CISC设计和更大的缓存容量使其在绝对性能上领先，但ARM指令集的RISC设计在特定场景下展现出更好的扩展性；(3)编程语言选择与指令集架构之间存在显著交互作用，C++在x86上获得的优化收益更大，而ARM架构上语言差异相对较小。实验深入分析了指令集设计对性能优化的影响机制，为面向不同架构的软件开发提供了实证指导。
+
+\vspace{1em}
+\noindent\textbf{关键词：}缓存优化；超标量优化；指令集架构；x86-CISC；ARM-RISC；空间局部性；指令级并行
+\end{cnabstract}
+
+% 英文摘要
+\phantomsection
+\begin{center}{\zihao{4}\bfseries{Abstract}}\end{center}\par\vspace{0.5em}
+\addcontentsline{toc}{section}{Abstract}
+\begin{enabstract}
+This experiment investigates the impact of cache optimization and superscalar techniques on program performance through matrix-vector multiplication and array summation problems, analyzing how different instruction set architectures (ISAs) respond to spatial locality and instruction-level parallelism optimizations. The experiments were conducted on x86-64 and ARM (aarch64) architectures, comparing both C++ and Python implementations. Results show: (1) different ISAs respond distinctively to optimization strategies, with x86 being more sensitive to cache locality issues while ARM demonstrating unique advantages in instruction-level parallelism and recursive optimizations; (2) x86's CISC design and larger cache capacity lead to better absolute performance, but ARM's RISC design shows better scalability in specific scenarios; (3) programming language choice interacts significantly with instruction set architectures, with C++ gaining greater optimization benefits on x86, while language differences are relatively smaller on ARM. The experiment provides empirical guidance for software development targeting different architectures by analyzing how instruction set design influences optimization effectiveness.
+
+\vspace{1em}
+\noindent\textbf{Keywords:} Cache Optimization; Superscalar Optimization; Instruction Set Architecture; x86-CISC; ARM-RISC; Spatial Locality; Instruction-Level Parallelism
+\end{enabstract}
+
+% 目录
+\clearpage
+\tableofcontents
+\clearpage
+
+% 实验环境部分
+\section{实验环境}
+
+\subsection{硬件环境}
+
+\subsubsection{x86环境}
+\begin{itemize}
+  \item \textbf{处理器}：12th Gen Intel(R) Core(TM) i5-12500H (2.5-4.5GHz)
+  \item \textbf{缓存}：L1 48KB/32KB (指令/数据), L2 1.25MB/核, L3 18MB共享
+  \item \textbf{CPU核心}：16 (8P+8E), 内存：7.6GiB
+  \item \textbf{系统}：WSL2 Ubuntu 24.04, 内核 5.15.167.4
+\end{itemize}
+
+\subsubsection{ARM环境}
+\begin{itemize}
+  \item \textbf{处理器}：QEMU模拟的ARM处理器 (aarch64, 2.0GHz)
+  \item \textbf{缓存}：L1 32KB/32KB, L2 512KB, L3 4MB
+  \item \textbf{系统}：QEMU 7.2.0 on WSL2 Ubuntu 24.04
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{architecture_comparison.png}
+    \caption{硬件架构比较雷达图}
+    \label{fig:hardware_config}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{access_patterns_diagram.png}
+    \caption{访问模式示意图}
+    \label{fig:access_patterns}
+  \end{subfigure}
+  \caption{硬件架构与访问模式分析}
+  \label{fig:hardware_access}
+\end{figure}
+
+\textbf{图1 架构特性雷达图}：展示了x86-64与ARM aarch64架构在多个性能指标上的相对强弱。x86-64在缓存大小、乱序执行能力和SIMD宽度等方面具有明显优势，有利于指令级并行和向量化计算；ARM架构虽然在这些指标上较低，但设计更为平衡。两者共同特点是相同的缓存行大小(64字节)，表明针对空间局部性的优化策略在两种架构上都有效。该图直观展示了为什么某些优化在不同架构上效果有差异。
+
+\textbf{图2 矩阵访问模式示意图}：直观展示了两种不同的矩阵访问模式及其对性能的影响。上图为列优先访问方式，在C/C++行优先存储的内存布局下，导致内存访问跨度大（stride=n），缓存未命中率高达33.2\%，4000x4000矩阵上执行时间达123.36ms；下图为行优先访问方式，访问顺序与内存存储顺序一致（stride=1），充分利用空间局部性，缓存未命中率仅为3.3\%，同样大小的矩阵计算仅需17.09ms。红色箭头表示主要访问路径，蓝色箭头表示转换到下一行/列的路径。这一可视化解释了为什么内存访问模式对性能影响如此显著。
+
+\subsection{软件环境}
+
+\begin{itemize}
+  \item \textbf{编译环境}：
+    \begin{itemize}
+      \item GCC 13.3.0，编译选项：-O0/-O2/-O3
+      \item ARM交叉编译使用aarch64-linux-gnu-g++
+    \end{itemize}
+  \item \textbf{Python环境}：
+    \begin{itemize}
+      \item Python 3.11.6
+      \item NumPy 1.26.1, Matplotlib 3.8.2, pandas 2.1.4
+    \end{itemize}
+  \item \textbf{性能分析工具}：
+    \begin{itemize}
+      \item Valgrind Cachegrind 3.21.0
+      \item perf 5.15
+      \item Python cProfile
+    \end{itemize}
+\end{itemize}
+
+\textit{注：ARM性能测试在QEMU模拟环境下进行，存在额外开销，影响绝对性能数据。但相对加速比仍能反映架构响应特性。Python代码在两种架构上使用相同版本的解释器和库，确保测试结果可比性。}
+
+\section{实验一：n×n矩阵与向量内积}
+
+\subsection{算法设计}
+
+\subsubsection{平凡算法设计思路}
+
+平凡算法采用列优先访问方式计算矩阵与向量的内积。对于n×n的矩阵A和长度为n的向量x，结果向量y的计算公式为：
+
+\begin{equation}
+  y[i] = \sum_{j=0}^{n-1} A[i][j] \times x[j]
+\end{equation}
+
+列优先访问实现代码：
+
+\begin{lstlisting}[language=C++]
+void col_access(const std::vector<std::vector<double>>& matrix, 
+               const std::vector<double>& vector,
+               std::vector<double>& result) {
+    int n = matrix.size();
+    for (int j = 0; j < n; j++) {  // 列优先访问
+        for (int i = 0; i < n; i++) {
+            result[i] += matrix[i][j] * vector[j];
+        }
+    }
+}
+\end{lstlisting}
+
+这种方式在访问矩阵元素时，由于C/C++中二维数组按行存储的特性，会导致大步幅访问，相邻两次访问的\verb|matrix[i][j]|和\verb|matrix[i+1][j]|在内存中相距n个元素，导致频繁的缓存缺失。
+
+\subsubsection{cache优化算法设计思路}
+
+行优先访问和循环展开优化代码：
+
+\begin{lstlisting}[language=C++]
+void row_access(const std::vector<std::vector<double>>& matrix, 
+               const std::vector<double>& vector,
+               std::vector<double>& result) {
+    int n = matrix.size();
+    for (int i = 0; i < n; i++) {  // 行优先访问
+        double sum = 0.0;
+        for (int j = 0; j < n; j++) {
+            sum += matrix[i][j] * vector[j];
+        }
+        result[i] = sum;
+    }
+}
+
+void unroll10(const std::vector<std::vector<double>>& matrix, 
+            const std::vector<double>& vector,
+            std::vector<double>& result) {
+    int n = matrix.size();
+    for (int i = 0; i < n; i++) {
+        double sum = 0.0;
+        int j = 0;
+        for (; j <= n - 10; j += 10) {
+            sum += matrix[i][j] * vector[j] +
+                   matrix[i][j+1] * vector[j+1] +
+                   matrix[i][j+2] * vector[j+2] +
+                   matrix[i][j+3] * vector[j+3] +
+                   matrix[i][j+4] * vector[j+4];
+        }
+        for (; j < n; j++) {
+            sum += matrix[i][j] * vector[j];
+        }
+        result[i] = sum;
+    }
+}
+\end{lstlisting}
+
+\subsection{性能测试}
+
+测量结果表明，行优先访问在各矩阵大小上都比列优先访问快约7-12倍，循环展开可进一步提升性能。在4000x4000矩阵上，列访问耗时123.36ms，行访问降至17.09ms，Unroll10进一步优化至10.13ms。
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[b]{0.45\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{matrix_vector_performance.png}
+    \caption{矩阵向量乘法性能比较}
+    \label{fig:matrix_vector_performance}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.45\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{matrix_vector_detail_performance.png}
+    \caption{详细性能对比}
+    \label{fig:detail_performance}
+  \end{subfigure}
+  \caption{矩阵向量乘法实验结果}
+  \label{fig:matrix_results}
+\end{figure}
+
+\textbf{图3 矩阵-向量乘法性能}：左图展示了不同算法在各矩阵尺寸下的执行时间（对数刻度），右图展示了相对于列访问的加速比。数据显示：(1) 矩阵规模增大时，列访问性能下降最快，4000x4000矩阵时达到123.36ms；(2) 行访问通过优化空间局部性将执行时间降至17.09ms，加速比为7.2倍；(3) Unroll10算法在所有矩阵尺寸上都表现最佳，4000x4000矩阵上达到12.2倍加速比；(4) 随着矩阵规模增大，空间局部性优化的效果更为显著，这与理论预期一致。这表明内存访问模式对性能的影响随问题规模增大而更加突出。
+
+\textbf{图4 详细性能对比}：左图展示4000x4000矩阵上各算法的执行时间，右图展示相对于列访问的性能提升百分比。数据表明：(1) 列访问是最慢的(123.36ms)；(2) 行访问降低86.1\%至17.09ms；(3) Unroll10表现最佳，执行时间仅为10.13ms，相比列访问提升了91.8\%；(4) 所有优化方法都获得了显著提升，即使最小的改进(Unroll15)也比列访问快89.4\%。这证明了针对特定硬件架构的优化策略能够带来显著性能收益。
+
+\subsubsection{编译器优化影响}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.45\textwidth]{compiler_opt_matrix.png}
+  \caption{编译器优化对矩阵乘法的影响}
+  \label{fig:compiler_opt_matrix}
+\end{figure}
+
+\textbf{图7 编译器优化级别影响}：展示了不同编译优化级别对矩阵计算性能的影响。无优化(O0)时列访问耗时225.64ms，行访问65.56ms；O3优化后分别提升至100.03ms和12.66ms。红线加速比走势表明编译器优化开始能提高加速比，在O2达到最高的9.13，但之后开始下降。这可能是因为O3级别下编译器对列访问模式进行了更激进的优化，缩小了与行访问之间的相对差距。这说明编译器优化虽然重要，但不能完全弥补算法设计中的本质缺陷。
+
+\subsection{profiling}
+
+\subsubsection{平凡算法}
+
+使用Cachegrind分析平凡算法（列优先访问）的缓存性能：L1缓存未命中率约33.2\%，主要发生在内层循环访问\verb|matrix[i][j]|时，由于列优先访问导致的跨行访问，每次访问大概率会触发新的缓存行加载。
+
+\subsubsection{cache优化算法}
+
+行优先访问的缓存性能显著改善：L1缓存未命中率仅约3.3\%，缓存行利用率高，一次加载的缓存行中的多个元素会被连续使用。循环展开效果分析显示Unroll10展开级别在4000x4000矩阵上性能最佳，比基础行访问提升约40.7\%。
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.45\textwidth]{cache_miss_analysis.png}
+  \caption{缓存未命中分析}
+  \label{fig:cache_miss}
+\end{figure}
+
+\textbf{图5 缓存未命中分析}：左图对比了列访问和行访问的L1缓存未命中率，列访问的未命中率(33.2\%)显著高于行访问(3.3\%)；右图展示了平均内存访问延迟，列访问(12.7周期)远高于行访问(4.2周期)，这直接解释了列访问性能差的原因。这一数据从底层硬件角度验证了性能差异的根本原因。
+
+\subsection{架构对比分析}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.45\textwidth]{matrix_arch_comparison.png}
+  \caption{x86与ARM架构性能对比}
+  \label{fig:arch_comparison}
+\end{figure}
+
+x86架构上缓存优化的收益在大矩阵（4000x4000）上更高(3.63倍)，而ARM架构上加速比随矩阵增大先提高后下降，在2000x2000矩阵上达到最高的1.86倍。这一现象可能是由于ARM架构的较小缓存容量（L2:512KB，L3:4MB）在处理4000x4000矩阵时已经饱和，导致即使是行访问模式也无法完全避免频繁的缓存替换。如图\ref{fig:arch_comparison}所示。
+
+\section{实验二：n个数求和}
+
+\subsection{算法设计}
+
+\subsubsection{平凡算法设计思路}
+
+平凡算法采用简单的顺序求和方式：
+
+\begin{lstlisting}[language=C++]
+double naive_sum(const std::vector<double>& array) {
+    double sum = 0.0;
+    for (size_t i = 0; i < array.size(); ++i) {
+        sum += array[i];
+    }
+    return sum;
+}
+\end{lstlisting}
+
+此算法有良好的空间局部性，但存在严重的数据依赖。
+
+\subsubsection{超标量优化算法设计思路}
+
+双链路算法通过创建两个独立的累加路径，让处理器能够同时执行两个独立的累加操作：
+
+\begin{lstlisting}[language=C++]
+double dual_path_sum(const std::vector<double>& array) {
+    double sum1 = 0.0, sum2 = 0.0;
+    size_t n = array.size();
+    for (size_t i = 0; i < n; i += 2) {
+        sum1 += array[i];
+        if (i + 1 < n) sum2 += array[i + 1];
+    }
+    return sum1 + sum2;
+}
+\end{lstlisting}
+
+\subsection{性能测试}
+
+实际测量结果表明双链路算法在较大数据集上有显著优势。在2\textsuperscript{24}大小的数组上，朴素算法耗时16.39ms，双链路算法降至10.49ms，获得约1.56倍加速。
+
+\begin{table}[htbp]
+\centering
+\caption{优化算法性能对比}
+\label{tab:opt_sum_perf}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+\textbf{数组大小} & \textbf{朴素算法(ms)} & \textbf{双链路算法(ms)} & \textbf{递归算法(ms)} & \textbf{双链路加速比} & \textbf{递归加速比} \\
+\hline
+2\textsuperscript{18} (1M) & 1.21 & 2.39 & 2.03 & 0.50 & 0.60 \\
+\hline
+2\textsuperscript{22} (4M) & 3.53 & 3.70 & 5.47 & 0.95 & 0.65 \\
+\hline
+2\textsuperscript{24} (16M) & 16.39 & 10.49 & 45.25 & 1.56 & 0.36 \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[b]{0.45\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{sum_array_performance.png}
+    \caption{数组求和性能比较}
+    \label{fig:sum_array_performance}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.45\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{compiler_opt_sum.png}
+    \caption{编译器优化对数组求和的影响}
+    \label{fig:compiler_opt_sum}
+  \end{subfigure}
+  \caption{数组求和实验结果}
+  \label{fig:array_results}
+\end{figure}
+
+\textbf{图9 数组求和算法对比}：左图展示了不同算法随数据规模增长的性能变化。朴素算法(蓝色)在较小数据规模(2\textsuperscript{18}、2\textsuperscript{22})下表现最佳；双链路算法(橙色)仅在较大数据规模(2\textsuperscript{24})上有效，获得1.56倍加速；递归算法(绿色)性能整体较差，在所有测试规模上都慢于朴素算法。从右图加速比可以看出，随着数据规模增大，双链路算法的加速比逐渐提高，而递归算法则始终表现不佳。这说明优化方法的有效性与数据规模密切相关，并不是所有优化都能在所有场景下获益。
+
+\textbf{图10 编译器优化影响}：上图展示了优化级别对算法性能的影响。双链路算法在O3级别下表现最佳；递归算法O3级别下得到显著改善。下图显示O3级别下双链路算法获得了更高的加速比。这表明编译器优化能够识别并强化某些算法中的并行性潜力，特别是对指令级并行度较高的代码。
+
+\subsection{profiling}
+
+\subsubsection{平凡算法}
+
+平凡算法的cachegrind分析显示缓存未命中率很低（约0.1\%），因为数组顺序访问具有良好的空间局部性，主要瓶颈是指令间的数据依赖。
+
+\subsubsection{超标量优化算法}
+
+双链路算法的缓存未命中率与平凡算法相当，性能提升主要来自于减少了数据依赖，允许CPU更好地进行流水线操作，两个独立的累加操作可以并行执行，提高了CPU利用率。
+
+\subsection{架构对比分析}
+
+双链路算法在两种架构上都有效，但加速效果与数据规模关系显示不同模式。这表明指令级并行优化在不同架构上的有效性相对稳定，不像缓存优化那样受硬件差异影响显著。如图\ref{fig:arch_comparison}(b)所示。
+
+\section{实验总结和思考}
+
+\subsection{x86与ARM指令集架构优化比较}
+
+两种指令集架构的根本设计哲学差异直接影响了优化效果：
+
+\begin{itemize}
+  \item \textbf{指令集架构设计差异}：
+  \begin{itemize}
+    \item x86采用CISC(复杂指令集计算机)架构，单条指令可执行复杂操作，指令长度可变
+    \item ARM采用RISC(精简指令集计算机)架构，指令长度固定，操作简单统一
+    \item 这些差异影响了指令解码、执行效率和内存访问模式
+  \end{itemize}
+  
+  \item \textbf{矩阵-向量乘法实验发现}：
+  \begin{itemize}
+    \item x86指令集架构对缓存优化响应更强，4000×4000矩阵上行访问比列访问快7.2倍
+    \item ARM指令集架构虽然绝对性能较低，但同样从缓存优化中获益，加速比可达1.78倍
+    \item x86的AVX2 SIMD指令(256位宽)使循环展开优化在x86上更有效(提升约40.7\%)，而ARM的NEON指令(128位宽)在循环展开上收益较小
+  \end{itemize}
+  
+  \item \textbf{数组求和实验发现}：
+  \begin{itemize}
+    \item 双链路算法在x86指令集上最高加速比1.56倍，在大数据集(16M)上效果最佳
+    \item ARM指令集上双链路算法表现出更平稳的扩展性，中等数据集上加速比可达1.84倍
+    \item 令人意外的是，递归算法在ARM指令集上的相对性能劣势(0.60-0.67)小于x86(0.43-0.79)
+    \item 这表明ARM的精简指令集设计在处理函数调用和栈操作时可能效率更高
+  \end{itemize}
+  
+  \item \textbf{指令执行机制对比}：
+  \begin{itemize}
+    \item x86采用更复杂的乱序执行引擎，可同时处理更多指令，但预测错误惩罚更大
+    \item ARM的简化执行流水线虽然指令级并行度较低，但分支预测错误惩罚较小
+    \item 实验数据表明x86在规则访问模式上获益更多，而ARM在不规则控制流(如递归)上相对更有弹性
+  \end{itemize}
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.65\textwidth]{optimization_strategies_comparison.png}
+  \caption{不同指令集架构下的优化策略对比}
+  \label{fig:opt_strategies}
+\end{figure}
+
+\textbf{图13 不同指令集架构下的优化策略对比}：左图显示了两类优化在不同架构上的性能提升水平：在x86指令集上，空间局部性优化带来约7.2倍性能提升，而在ARM上仅为1.78倍；ILP优化在x86上提供约1.5倍提升，在ARM上达到1.84倍。右图比较了优化策略与指令集架构的适配性：x86-CISC架构对内存访问模式高度敏感，优化空间局部性收益显著；ARM-RISC架构对函数调用开销相对较低，在复杂控制流上表现更为平衡。这一对比揭示了指令集设计哲学如何影响优化策略的效果，对跨架构软件开发具有重要指导意义。
+
+\subsection{语言与指令集交互影响}
+
+编程语言的选择与指令集架构之间存在显著交互作用：
+
+\begin{itemize}
+  \item \textbf{C++在不同指令集上的表现}：
+  \begin{itemize}
+    \item C++在x86上获得的缓存优化收益更大（行访问比列访问快7.2倍）
+    \item 在ARM架构上，C++缓存优化收益较小（加速比约1.78倍）
+    \item 这反映了C++编译器对不同指令集优化能力的差异
+  \end{itemize}
+  
+  \item \textbf{Python与指令集的交互}：
+  \begin{itemize}
+    \item Python在两种架构上的相对表现差异较小
+    \item 解释器开销掩盖了部分硬件架构差异
+    \item NumPy在ARM上相对于原生Python的优势更为显著
+  \end{itemize}
+  
+  \item \textbf{优化策略的跨语言跨架构效应}：
+  \begin{itemize}
+    \item 空间局部性优化在所有语言和架构组合中都有效，但效果差异显著
+    \item 指令级并行优化在解释型语言中几乎无效，与指令集架构关系不大
+    \item 编译器优化(-O3)对递归算法的改进在ARM上更为显著
+  \end{itemize}
+\end{itemize}
+
+\subsection{总结}
+
+本实验通过实际测量和理论分析，揭示了不同指令集架构下缓存优化和超标量优化的效果差异，得出以下核心结论：
+
+\begin{enumerate}
+  \item 缓存优化对性能提升的贡献通常大于指令级并行优化，特别是对于大数据集，但这种优势在x86指令集上更为显著。
+  
+  \item 不同指令集架构对优化策略的响应有显著差异：x86-CISC架构对缓存优化更敏感，ARM-RISC架构在ILP优化和复杂控制流处理方面表现出色。
+  
+  \item 编程语言的选择对性能影响巨大，且与指令集架构存在交互作用：C++在x86上获得的优化收益更大，而ARM架构上语言差异相对较小。
+  
+  \item 两种指令集架构的指令粒度、执行模型和缓存层次结构差异直接决定了优化策略的有效性。
+  
+  \item 算法设计应首先考虑目标指令集架构特性，x86平台应优先考虑内存局部性，ARM平台则需平衡考虑内存访问和控制流优化。
+  
+  \item 编译器优化能大幅提升代码性能，但优化效果与指令集架构密切相关，某些优化在特定架构上可能适得其反。
+\end{enumerate}
+
+这些发现对跨平台软件开发和异构计算系统优化具有重要指导意义。未来工作可探索SIMD向量化(如x86 AVX512与ARM SVE指令集)、多线程并行等更高级优化策略在不同指令集架构上的效果差异，以及更多指令集架构(如RISC-V、LoongArch等)的性能特性对比。
+
+\clearpage
+% 参考文献章节样式定义
+\def\bibsection{
+  \section*{\refname\markboth{\refname}{\refname}}%
+  \addcontentsline{toc}{section}{\refname}%
+  \begingroup
+    \fontsize{12}{14}\selectfont% 章节标题字体大小
+    \vspace{0.8em}
+  \endgroup
+}
+
+% 确保所有参考文献都被包含
+\nocite{*}
+
+% 使用纯natbib方式处理参考文献
+\bibliography{reference.bib}
+
+\end{document} 

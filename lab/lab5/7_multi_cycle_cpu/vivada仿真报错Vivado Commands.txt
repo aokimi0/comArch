@@ -1,0 +1,11 @@
+vivada仿真报错Vivado Commands
+General Messages
+[USF-XSim-62] 'elaborate' step failed with error(s). Please check the Tcl console output or 'D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/lab5-2.sim/sim_1/behav/xsim/elaborate.log' file for more information.
+
+[Vivado 12-4473] Detected error while running simulation. Please correct the issue and retry this operation.
+
+Simulation
+sim_1
+[VRFC 10-2063] Module <BLK_MEM_GEN_V6_1> not found while processing module instance <inst> ["D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5/7_multi_cycle_cpu/inst_rom.v":51]
+
+[XSIM 43-3322] Static elaboration of top level Verilog design unit(s) in library work failed.

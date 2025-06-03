@@ -1,0 +1,18 @@
+0.6
+2019.2
+Nov  6 2019
+21:57:16
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/adder.v,1461905924,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/alu.v,,adder,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/alu.v,1747158737,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/decode.v,,alu,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/decode.v,1747155190,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/exe.v,,decode,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/exe.v,1461985662,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/fetch.v,,exe,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/fetch.v,1462524268,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/mem.v,,fetch,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/mem.v,1747156203,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/multi_cycle_cpu.v,,mem,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/multi_cycle_cpu.v,1747155998,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/regfile.v,,multi_cycle_cpu,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/multi_cycle_cpu_display.v,1479396004,verilog,,,,multi_cycle_cpu_display,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/regfile.v,1747154839,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/wb.v,,regfile,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/tb.v,1461985666,verilog,,,,tb,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/wb.v,1462526906,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/tb.v,,wb,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/lab5-2.sim/sim_1/behav/xsim/glbl.v,1573089660,verilog,,,,glbl,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/lab5-2.srcs/sources_1/ip/data_ram/sim/data_ram.v,1747149179,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/lab5-2.srcs/sources_1/ip/inst_rom/sim/inst_rom.v,,data_ram,,,,,,,,
+D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/lab5-2.srcs/sources_1/ip/inst_rom/sim/inst_rom.v,1747149714,verilog,,D:/BaiduSyncdisk/3rd-year-spring/comArch/lab/lab5-2/7_multi_cycle_cpu/adder.v,,inst_rom,,,,,,,,
