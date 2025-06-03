@@ -1,0 +1,13 @@
+.cursorurles
+reference/
+.DS_Store
+*.log
+*.tmp
+node_modules/
+__pycache__/
+*.pyc
+.env
+.vscode/
+*.swp
+*.swo
+*~ 
