@@ -1,4 +1,5 @@
 .cursorurles
+.cursor/
 reference/
 .DS_Store
 *.log
