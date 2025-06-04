@@ -1,84 +1,85 @@
 #!/bin/bash
 
-# Get the directory of the script itself and cd into it
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR" || exit
-
-# Define paths relative to the script's directory (lesson3)
+# 定义相关路径和文件名
+LESSON_DIR="lesson3"
 SRC_DIR="src"
 LOG_DIR="log"
 REPORT_DIR="report"
-DATA_DIR="data"
 
-SOURCE_FILE="$SRC_DIR/mlp_train_dcu.cpp"
-HIP_EXECUTABLE="$SRC_DIR/mlp_train_dcu_hip_executable"
-CPU_EXECUTABLE="$SRC_DIR/mlp_train_dcu_cpu_executable"
+CPP_SRC_FILE="mlp_train_dcu.cpp"
+EXECUTABLE_NAME="mlp_train_dcu"
 LOG_FILE="$LOG_DIR/mlp_train_perf.log"
 
-# Create necessary directories if they don't exist
-mkdir -p "$SRC_DIR"
+# 进入 lesson3 目录 (如果脚本不是从 lesson3 内部运行)
+# cd "$LESSON_DIR" || exit
+
+# 清理旧的日志和可执行文件
+rm -f "$EXECUTABLE_NAME" "$LOG_FILE"
+
+# 创建日志目录 (如果不存在)
 mkdir -p "$LOG_DIR"
-mkdir -p "$REPORT_DIR"
-mkdir -p "$DATA_DIR"
 
-# Clean up old log and executables
-rm -f "$LOG_FILE"
-rm -f "$HIP_EXECUTABLE"
-rm -f "$CPU_EXECUTABLE"
+echo "=====================================================" | tee -a "$LOG_FILE"
+echo "Lesson 3: MLP Training & Inference Performance Test" | tee -a "$LOG_FILE"
+echo "Timestamp: $(date)" | tee -a "$LOG_FILE"
+echo "=====================================================" | tee -a "$LOG_FILE"
+echo "" | tee -a "$LOG_FILE"
 
-echo "Current working directory: $(pwd)"
-
-# Check if data file exists
-if [ ! -f "$DATA_DIR/starlink_bw.json" ]; then
-    echo "Error: Data file $DATA_DIR/starlink_bw.json not found in $(pwd)/$DATA_DIR/" >&2
-    echo "Please ensure the data file is present before running." >&2
-    exit 1 # Exit if data file is crucial and not found
-fi
-
-echo "Attempting to compile with hipcc (ENABLE_HIP_CODE defined)..."
-# Note: ROCM_PATH might be needed if hipcc is not in default PATH
-# Example: ROCM_PATH=${ROCM_PATH:-/opt/rocm}
-# "$ROCM_PATH/bin/hipcc" ...
-/opt/rocm/bin/hipcc -DENABLE_HIP_CODE "$SOURCE_FILE" -o "$HIP_EXECUTABLE" -Wall -O2
-
-EXECUTABLE_TO_RUN=""
-
-if [ -f "$HIP_EXECUTABLE" ]; then
-    echo "Compilation with hipcc successful: $HIP_EXECUTABLE"
-    EXECUTABLE_TO_RUN="$HIP_EXECUTABLE"
+# 检查 hipcc 是否可用
+if ! command -v hipcc &> /dev/null
+then
+    echo "[ERROR] hipcc command not found. Cannot compile HIP code." | tee -a "$LOG_FILE"
+    echo "Please ensure HIP SDK is installed and hipcc is in your PATH." | tee -a "$LOG_FILE"
+    # 即使 hipcc 不可用，由于代码主要依赖CPU执行并模拟计时，这里可以选择继续尝试编译（如果g++可以处理）
+    # 或者直接报错退出。当前选择报错并提示，但允许用户修改脚本以适应纯CPU编译（移除-DENABLE_HIP_CODE）。
+    echo "Attempting to compile with g++ as a fallback for CPU part if main is not guarded..." | tee -a "$LOG_FILE"
+    COMPILER="g++"
+    COMPILE_FLAGS="-std=c++17 -O3"
+    # The -DENABLE_HIP_CODE should ideally not be used if hipcc is not found and kernels are not guarded for g++
 else
-    echo "hipcc compilation failed. Output was:"
-    # Try to show hipcc error if any was redirected, or just a message
-    echo "(hipcc error message might have been complex or not captured if it hung)"
-    echo "Attempting to compile with g++ for CPU fallback (ENABLE_HIP_CODE NOT defined)..."
-    g++ -std=c++17 "$SOURCE_FILE" -o "$CPU_EXECUTABLE" -Wall -O2 -lm
-    if [ -f "$CPU_EXECUTABLE" ]; then
-        echo "Compilation with g++ successful: $CPU_EXECUTABLE"
-        EXECUTABLE_TO_RUN="$CPU_EXECUTABLE"
-    else
-        echo "g++ compilation also failed. Cannot run the program." >&2
-        # Create a dummy log file indicating failure, so report generation doesn't entirely break
-        echo "FATAL: Compilation failed for both hipcc and g++." > "$LOG_FILE"
-        echo "Source file: $SOURCE_FILE" >> "$LOG_FILE"
-        echo "Please check compiler errors and environment." >> "$LOG_FILE"
-        echo "Script finished with errors." >&2
-        exit 1
-    fi
+    COMPILER="hipcc"
+    # ENABLE_HIP_CODE 宏用于激活代码中与HIP相关的部分（例如空的核函数调用和hipMalloc/hipFree模拟）
+    COMPILE_FLAGS="-std=c++17 -DENABLE_HIP_CODE -O3"
 fi
 
-if [ -n "$EXECUTABLE_TO_RUN" ]; then
-    echo "Running MLP training and testing (output to $LOG_FILE)..."
-    # Run the executable. Its CWD will be lesson3/
-    # The C++ code will look for data/starlink_bw.json which is lesson3/data/starlink_bw.json
-    "$EXECUTABLE_TO_RUN" > "$LOG_FILE" 2>&1
-    if [ $? -eq 0 ]; then
-        echo "Execution finished successfully. Log saved to $(pwd)/$LOG_FILE"
+echo "--- Compiling MLP Training Code ($CPP_SRC_FILE) --- " | tee -a "$LOG_FILE"
+echo "Compiler: $COMPILER" | tee -a "$LOG_FILE"
+echo "Compile flags: $COMPILE_FLAGS" | tee -a "$LOG_FILE"
+echo "Source: $SRC_DIR/$CPP_SRC_FILE" | tee -a "$LOG_FILE"
+echo "Output: $EXECUTABLE_NAME" | tee -a "$LOG_FILE"
+
+# 编译源代码
+if $COMPILER $SRC_DIR/$CPP_SRC_FILE -o $EXECUTABLE_NAME $COMPILE_FLAGS; then
+    echo "Compilation successful." | tee -a "$LOG_FILE"
+    echo "" | tee -a "$LOG_FILE"
+    echo "--- Running MLP Training & Testing --- " | tee -a "$LOG_FILE"
+    echo "Executing: ./$EXECUTABLE_NAME" | tee -a "$LOG_FILE"
+    echo "Output will be saved to: $LOG_FILE" | tee -a "$LOG_FILE"
+    echo "-------------------------------------------" | tee -a "$LOG_FILE"
+    
+    # 执行程序并将所有输出追加到日志文件
+    # 使用 time 命令记录整个执行的实际时间 (可选)
+    # (time ./$EXECUTABLE_NAME) >> "$LOG_FILE" 2>&1
+    ./$EXECUTABLE_NAME >> "$LOG_FILE" 2>&1
+    
+    EXEC_STATUS=$?
+    if [ $EXEC_STATUS -eq 0 ]; then
+        echo "-------------------------------------------" | tee -a "$LOG_FILE"
+        echo "Execution finished successfully." | tee -a "$LOG_FILE"
     else
-        echo "Execution failed. Check $LOG_FILE for error messages." >&2
-        # Log might still be useful
+        echo "-------------------------------------------" | tee -a "$LOG_FILE"
+        echo "[ERROR] Execution failed with status: $EXEC_STATUS" | tee -a "$LOG_FILE"
     fi
 else
-    echo "No executable was built. Cannot run." >&2
+    echo "[ERROR] Compilation failed." | tee -a "$LOG_FILE"
 fi
 
-echo "Script finished." 
+echo "" | tee -a "$LOG_FILE"
+echo "=====================================================" | tee -a "$LOG_FILE"
+echo "Lesson 3 MLP Test Script Finished." | tee -a "$LOG_FILE"
+echo "Log file: $LOG_FILE" | tee -a "$LOG_FILE"
+
+# 清理可执行文件 (可选, 根据需要保留)
+# rm -f "$EXECUTABLE_NAME"
+
+echo "run.sh script for Lesson 3 finished." 

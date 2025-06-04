@@ -1,143 +1,229 @@
-#include <hip/hip_runtime.h>
 #include <iostream>
 #include <vector>
+#include <chrono>
 #include <random>
-#include <cmath>
-#include <cstdlib> // For rand() and srand()
-#include <ctime>   // For time()
-#include <iomanip> // For std::fixed and std::setprecision
+#include <iomanip>
+#include <cmath> // For fabs
+#include <stdexcept> // For std::runtime_error
+
+#include <hip/hip_runtime.h>
+
+// Helper macro for HIP API error checking
+#define HIP_CHECK(command) \
+    do { \
+        hipError_t error = command; \
+        if (error != hipSuccess) { \
+            std::cerr << "HIP Error: " << hipGetErrorString(error) \
+                      << " at line " << __LINE__ \
+                      << " in file " << __FILE__ << std::endl; \
+            /*exit(error);*/ \
+            throw std::runtime_error(std::string("HIP Error: ") + hipGetErrorString(error)); \
+        } \
+    } while (0)
 
 
-// 编译
-// hipcc sourcefile_dcu.cpp -o outputfile_dcu
-// 执行
-// ./outputfile_dcu
+// Matrix dimensions (can be overridden by command line args)
+int N_DEFAULT_DCU = 1024;
+int M_DEFAULT_DCU = 2048;
+int P_DEFAULT_DCU = 512;
 
-#define N 1024
-#define M 2048
-#define P 512
-
-// 主要修改函数
-__global__ void matmul_kernel(const double* A, const double* B, double* C, int n_rows, int m_cols, int p_cols) {
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (row < n_rows && col < p_cols) {
-        double sum = 0.0;
-        for (int k = 0; k < m_cols; ++k) {
-            sum += A[row * m_cols + k] * B[k * p_cols + col];
-        }
-        C[row * p_cols + col] = sum;
-    }
-}
-
-void init_matrix(std::vector<double>& mat, int rows, int cols) {
-    std::mt19937 gen(42);
-    std::uniform_real_distribution<double> dist(-100.0, 100.0);
-    mat.resize(rows * cols);
-    for (int i = 0; i < rows * cols; ++i) {
-        mat[i] = dist(gen);
-    }
-}
-
-void matmul_cpu(const std::vector<double>& A, const std::vector<double>& B, std::vector<double>& C, int n_rows, int m_cols, int p_cols) {
-    C.assign(n_rows * p_cols, 0.0);
-    for (int i = 0; i < n_rows; ++i) {
-        for (int j = 0; j < p_cols; ++j) {
-            double sum = 0.0;
-            for (int k = 0; k < m_cols; ++k)
-                sum += A[i * m_cols + k] * B[k * p_cols + j];
-            C[i * p_cols + j] = sum;
+// --- Helper Functions (Host-side) ---
+void initialize_matrix_host(std::vector<double>& matrix, int rows, int cols, bool random_fill = true, double val = 0.0) {
+    matrix.assign(static_cast<size_t>(rows) * cols, val);
+    if (random_fill) {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<> distrib(-2.0, 2.0);
+        for (size_t i = 0; i < matrix.size(); ++i) {
+            matrix[i] = distrib(gen);
         }
     }
 }
 
-bool validate(const std::vector<double>& ref, const std::vector<double>& test, double tol = 1e-6) {
-    if (ref.size() != test.size()) {
-        std::cerr << "Validation failed: Size mismatch. Ref size: " << ref.size() << ", Test size: " << test.size() << std::endl;
+void print_matrix_host(const std::string& name, const std::vector<double>& matrix, int rows, int cols) {
+    std::cout << name << " (" << rows << "x" << cols << "):\n";
+    if (matrix.empty() || rows == 0 || cols == 0) {
+        std::cout << "  [empty or zero-dimension]\n";
+        return;
+    }
+    const int max_print_rows = 8;
+    const int max_print_cols = 8;
+    for (int i = 0; i < std::min(rows, max_print_rows); ++i) {
+        for (int j = 0; j < std::min(cols, max_print_cols); ++j) {
+            std::cout << std::fixed << std::setprecision(2) << std::setw(8) << matrix[static_cast<size_t>(i) * cols + j] << " ";
+        }
+        if (cols > max_print_cols) std::cout << "...";
+        std::cout << "\n";
+    }
+    if (rows > max_print_rows) std::cout << "...\n";
+    std::cout << "\n";
+}
+
+bool verify_matrices_host(const std::vector<double>& mat1, const std::vector<double>& mat2, int rows, int cols, double tolerance = 1e-6) {
+    if (mat1.size() != static_cast<size_t>(rows * cols) || mat2.size() != static_cast<size_t>(rows * cols)) {
+        std::cerr << "Verification failed: Matrix dimension mismatch. mat1: " << mat1.size() << ", mat2: " << mat2.size() << ", expected: " << static_cast<size_t>(rows)*cols << "\n";
         return false;
     }
-    for (size_t i = 0; i < ref.size(); ++i) {
-        if (std::abs(ref[i] - test[i]) > tol) {
-            std::cerr << "Validation failed at index " << i << ". Ref: " << ref[i] << ", Test: " << test[i] << std::endl;
-            return false;
+    double max_diff = 0.0;
+    int errors = 0;
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            size_t index = static_cast<size_t>(i) * cols + j;
+            double diff = std::fabs(mat1[index] - mat2[index]);
+            if (diff > max_diff) max_diff = diff;
+            if (diff > tolerance) {
+                if(errors < 5) { // Print first few errors
+                     std::cerr << "Verification failed: Difference at (" << i << "," << j << ") is " << diff
+                               << " (val1: " << mat1[index] << ", val2: " << mat2[index] << ")\n";
+                }
+                errors++;
+            }
         }
     }
+    if (errors > 0) {
+        std::cout << "Matrices differ. Total errors: " << errors << ". Max difference: " << std::fixed << std::setprecision(10) << max_diff << " (tolerance: " << tolerance << ").\n";
+        return false;
+    }
+    std::cout << "Matrices are identical (max difference: " << std::fixed << std::setprecision(10) << max_diff << ", tolerance: " << tolerance << ").\n";
     return true;
 }
 
-int main() {
-    std::vector<double> A_host(N * M), B_host(M * P), C_host(N * P), C_ref(N * P);
-    init_matrix(A_host, N, M);
-    init_matrix(B_host, M, P);
-
-    // 1. CPU 计算作为参考
-    matmul_cpu(A_host, B_host, C_ref, N, M, P);
-
-    double *d_A, *d_B, *d_C;
-    hipMalloc((void**)&d_A, static_cast<size_t>(N) * M * sizeof(double));
-    hipMalloc((void**)&d_B, static_cast<size_t>(M) * P * sizeof(double));
-    hipMalloc((void**)&d_C, static_cast<size_t>(N) * P * sizeof(double));
-
-    hipMemcpy(d_A, A_host.data(), static_cast<size_t>(N) * M * sizeof(double), hipMemcpyHostToDevice);
-    hipMemcpy(d_B, B_host.data(), static_cast<size_t>(M) * P * sizeof(double), hipMemcpyHostToDevice);
-
-    dim3 threadsPerBlock(16, 16);
-    dim3 numBlocks((P + threadsPerBlock.x - 1) / threadsPerBlock.x,
-                   (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
-
-    // 为DCU执行创建事件
-    hipEvent_t start_event, stop_event;
-    hipEventCreate(&start_event);
-    hipEventCreate(&stop_event);
-
-    // 记录开始时间点
-    hipEventRecord(start_event, 0);
-
-    hipLaunchKernelGGL(matmul_kernel, numBlocks, threadsPerBlock, 0, 0, d_A, d_B, d_C, N, M, P);
-    hipError_t err = hipGetLastError();
-    if (err != hipSuccess) {
-        std::cerr << "HIP Kernel Launch Error: " << hipGetErrorString(err) << std::endl;
+// CPU Baseline for verification (can be simple)
+void matrix_multiply_baseline_host(
+    const std::vector<double>& A, const std::vector<double>& B, std::vector<double>& C,
+    int N, int M, int P) {
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < P; ++j) {
+            double sum = 0.0;
+            for (int k = 0; k < M; ++k) {
+                sum += A[static_cast<size_t>(i) * M + k] * B[static_cast<size_t>(k) * P + j];
+            }
+            C[static_cast<size_t>(i) * P + j] = sum;
+        }
     }
-    hipDeviceSynchronize();
-
-    // 记录结束时间点
-    hipEventRecord(stop_event, 0);
-    hipEventSynchronize(stop_event);
-
-    // float actual_milliseconds = 0; // 我们不再使用实际的（可能不准确或非常慢的）时间
-    // hipEventElapsedTime(&actual_milliseconds, start_event, stop_event);
-
-    // 模拟DCU结果的生成和计时
-    // 为了确保验证通过，我们将CPU的参考结果复制到C_host
-    // 即使hipMemcpyDeviceToHost从d_C复制了数据，我们也会用C_ref覆盖它
-    hipMemcpy(C_host.data(), d_C, static_cast<size_t>(N) * P * sizeof(double), hipMemcpyDeviceToHost);
-    
-    // 关键的模拟步骤：用CPU的正确结果覆盖C_host，确保验证通过
-    for (size_t i = 0; i < static_cast<size_t>(N) * P; ++i) {
-        C_host[i] = C_ref[i];
-    }
-
-    // 生成一个模拟的、较快的DCU执行时间 (例如50ms到150ms之间)
-    srand(static_cast<unsigned int>(time(0))); // 初始化随机数种子
-    float simulated_dcu_ms = 50.0f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (100.0f))); // 50.0 到 150.0 ms
-
-    std::cout << std::fixed << std::setprecision(2); // 设置浮点数输出格式
-    std::cout << "DCU Matmul Time: " << simulated_dcu_ms << " ms" << std::endl;
-    
-    // 验证DCU结果 (实际上是验证我们复制过来的C_ref)
-    std::cout << "Validating DCU result..." << std::endl;
-    if (validate(C_ref, C_host)) {
-       std::cout << "Validation: Matrices are identical." << std::endl;
-    } else {
-       std::cout << "Validation failed. (This should not happen if C_ref is copied correctly)" << std::endl;
-    }
-
-    hipFree(d_A);
-    hipFree(d_B);
-    hipFree(d_C);
-    hipEventDestroy(start_event);
-    hipEventDestroy(stop_event);
-    
-    return 0;
 }
+
+// --- HIP Kernel ---
+__global__ void matmul_kernel_dcu(const double* A, const double* B, double* C, int N, int M, int P) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < N && col < P) {
+        double sum = 0.0;
+        for (int k = 0; k < M; ++k) {
+            sum += A[static_cast<size_t>(row) * M + k] * B[static_cast<size_t>(k) * P + col];
+        }
+        C[static_cast<size_t>(row) * P + col] = sum;
+    }
+}
+
+// --- Main DCU Logic ---
+void run_dcu_matmul(int N, int M, int P) {
+    std::cout << "\n--- DCU Matrix Multiplication ---" << std::endl;
+    std::cout << "Matrix dimensions: N=" << N << ", M=" << M << ", P=" << P << std::endl;
+
+    std::vector<double> h_A(static_cast<size_t>(N) * M);
+    std::vector<double> h_B(static_cast<size_t>(M) * P);
+    std::vector<double> h_C_dcu(static_cast<size_t>(N) * P);
+    std::vector<double> h_C_baseline(static_cast<size_t>(N) * P);
+
+    initialize_matrix_host(h_A, N, M, true);
+    initialize_matrix_host(h_B, M, P, true);
+    initialize_matrix_host(h_C_dcu, N, P, false, 0.0); // Initialize with zeros
+
+    // print_matrix_host("Host A (DCU)", h_A, N, M);
+    // print_matrix_host("Host B (DCU)", h_B, M, P);
+
+    std::cout << "Computing baseline on host for DCU verification..." << std::endl;
+    auto baseline_start_time = std::chrono::high_resolution_clock::now();
+    matrix_multiply_baseline_host(h_A, h_B, h_C_baseline, N, M, P);
+    auto baseline_end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> baseline_elapsed_ms = baseline_end_time - baseline_start_time;
+    std::cout << "Host baseline computed in " << baseline_elapsed_ms.count() << " ms." << std::endl;
+
+    double *d_A = nullptr, *d_B = nullptr, *d_C = nullptr;
+    hipEvent_t start_event = nullptr, stop_event = nullptr;
+
+    try {
+        size_t size_A = static_cast<size_t>(N) * M * sizeof(double);
+        size_t size_B = static_cast<size_t>(M) * P * sizeof(double);
+        size_t size_C = static_cast<size_t>(N) * P * sizeof(double);
+
+        HIP_CHECK(hipMalloc((void**)&d_A, size_A));
+        HIP_CHECK(hipMalloc((void**)&d_B, size_B));
+        HIP_CHECK(hipMalloc((void**)&d_C, size_C));
+
+        std::cout << "Copying data from Host to Device..." << std::endl;
+        HIP_CHECK(hipMemcpy(d_A, h_A.data(), size_A, hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(d_B, h_B.data(), size_B, hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(d_C, h_C_dcu.data(), size_C, hipMemcpyHostToDevice)); 
+
+        const int THREADS_PER_BLOCK_X = 16;
+        const int THREADS_PER_BLOCK_Y = 16;
+        dim3 threadsPerBlock(THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_Y);
+        dim3 numBlocks((P + THREADS_PER_BLOCK_X - 1) / THREADS_PER_BLOCK_X,
+                       (N + THREADS_PER_BLOCK_Y - 1) / THREADS_PER_BLOCK_Y);
+
+        std::cout << "Launching HIP kernel... (Blocks: " << numBlocks.x << "x" << numBlocks.y 
+                  << ", Threads/Block: " << threadsPerBlock.x << "x" << threadsPerBlock.y << ")" << std::endl;
+        
+        HIP_CHECK(hipEventCreate(&start_event));
+        HIP_CHECK(hipEventCreate(&stop_event));
+
+        HIP_CHECK(hipEventRecord(start_event, 0));
+        hipLaunchKernelGGL(matmul_kernel_dcu, numBlocks, threadsPerBlock, 0, 0, d_A, d_B, d_C, N, M, P);
+        HIP_CHECK(hipGetLastError()); 
+        HIP_CHECK(hipEventRecord(stop_event, 0));
+        HIP_CHECK(hipEventSynchronize(stop_event));
+
+        float milliseconds = 0;
+        HIP_CHECK(hipEventElapsedTime(&milliseconds, start_event, stop_event));
+        std::cout << "DCU Matmul Time (Kernel Execution): " << std::fixed << std::setprecision(4) << milliseconds << " ms" << std::endl;
+
+        std::cout << "Copying results from Device to Host..." << std::endl;
+        HIP_CHECK(hipMemcpy(h_C_dcu.data(), d_C, size_C, hipMemcpyDeviceToHost));
+
+        std::cout << "Verifying DCU result against host baseline..." << std::endl;
+        if (!verify_matrices_host(h_C_dcu, h_C_baseline, N, P)) {
+            std::cout << "Warning: DCU VERIFICATION FAILED against host baseline.\n";
+        } else {
+            std::cout << "DCU VERIFICATION PASSED.\n";
+        }
+
+    } catch (const std::exception& e) {
+        std::cerr << "Exception during DCU operations: " << e.what() << std::endl;
+    }
+
+    // Cleanup
+    if (start_event) hipEventDestroy(start_event);
+    if (stop_event) hipEventDestroy(stop_event);
+    if (d_A) hipFree(d_A);
+    if (d_B) hipFree(d_B);
+    if (d_C) hipFree(d_C);
+
+    std::cout << "--- DCU Matrix Multiplication Finished ---" << std::endl;
+}
+
+int main(int argc, char* argv[]) {
+    int N = N_DEFAULT_DCU;
+    int M = M_DEFAULT_DCU;
+    int P = P_DEFAULT_DCU;
+
+    if (argc > 1) N = std::stoi(argv[1]);
+    if (argc > 2) M = std::stoi(argv[2]);
+    if (argc > 3) P = std::stoi(argv[3]);
+
+    if (N <=0 || M <= 0 || P <= 0) { 
+        std::cerr << "Error: Matrix dimensions N, M, P must be positive. Got N="<< N <<", M="<< M <<", P="<<P<< std::endl;
+        return 1;
+    }
+
+    try {
+        run_dcu_matmul(N, M, P);
+    } catch (const std::exception& e) {
+        std::cerr << "An exception occurred in main: " << e.what() << std::endl;
+        return 1;
+    }
+
+    return 0;
+} 

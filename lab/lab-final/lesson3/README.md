@@ -1,92 +1,133 @@
-# Lesson 3: LEO卫星通信带宽预测 MLP 训练与推理 (DCU 加速)
+# Lesson 3: 基于MLP的星地通信带宽预测与DCU训练加速
 
-## 任务描述
+## 1. 项目概览
 
-本部分任务旨在实现一个完整的 MLP (多层感知机) 模型，用于预测低地球轨道 (LEO) 卫星的通信带宽。任务包括数据预处理、MLP模型在DCU上的训练、以及在测试集上的推理与评估。
+本项目旨在使用多层感知机（MLP）神经网络，根据提供的星地通信历史带宽数据（`data/starlink_bw.json`），预测未来的通信带宽。关键实现包括：
 
-**数据集**: `lesson3/starlink_bw.json` (一个包含历史带宽数据的JSON数组)。
+- **MLP模型**：包含输入层、一个ReLU激活的隐藏层和线性输出层，用于回归预测。
+- **数据处理**：通过滑动窗口生成样本，并进行最小-最大归一化处理。
+- **训练与推断**：实现MLP的前向传播、反向传播（计算梯度）和随机梯度下降（SGD）优化器进行模型训练。训练完成后，在测试集上评估模型性能。
+- **DCU加速**：C++代码利用HIP API在DCU（曙光异构加速卡）上执行训练和推断的核心计算，包括数据传输（HtoD, DtoH）和核心计算（Kernels）。
+- **性能分析**：生成详细的性能日志，并使用Python脚本 (`src/performance_analysis.py`) 解析日志，可视化训练损失、训练时间分解和预测结果。
 
-**MLP 结构** (可调整，以下为建议参数):
-*   **输入层**: `INPUT_DIM` (例如 10)，表示使用过去10个时间点的数据预测下一个。
-*   **隐藏层**: `HIDDEN_DIM` (例如 64)，ReLU 激活函数。
-*   **输出层**: `OUTPUT_DIM` (1)，预测未来一个时间点的带宽。
-
-**主要步骤**:
-1.  **数据加载与预处理**: 
-    *   从 JSON 文件加载带宽数据。
-    *   对数据进行归一化处理 (Min-Max Scaling)。
-    *   使用滑动窗口方法创建时间序列样本 (X, y)，其中 X 是历史数据，y 是待预测数据。
-    *   划分训练集和测试集。
-2.  **MLP 模型训练 (DCU)**:
-    *   在 DCU 上实现 MLP 的前向传播、损失计算 (MSE)、反向传播和参数更新 (SGD)。
-    *   权重和偏置在主机端初始化，然后拷贝到DCU。
-    *   训练过程在 DCU 上完成，包括所有梯度计算和参数更新。
-    *   定期记录训练损失。
-3.  **模型推理与评估 (DCU)**:
-    *   使用训练好的模型在测试集上进行预测。
-    *   计算测试集上的 MSE 损失 (归一化和反归一化后)。
-    *   展示部分预测结果与真实值的对比。
-
-所有计算密集型操作（前向、反向、更新）均应在 DCU 上通过 HIP C++ 实现。
-
-## 目录结构
+## 2. 目录结构
 
 ```
 lesson3/
-├── src/
-│   └── mlp_train_dcu.cpp         # MLP 训练与推理 DCU (HIP C++) 实现
 ├── data/
-│   └── starlink_bw.json          # 带宽数据集
+│   └── starlink_bw.json        # 原始带宽数据
 ├── log/
-│   └── mlp_train_perf.log        # 训练与测试日志
+│   └── mlp_train_perf.log      # C++程序输出的性能日志
 ├── report/
-│   └── report.md               # 实验报告
-├── run.sh                      # 编译和运行脚本
-└── README.md                   # 说明文档
+│   ├── report.md                 # 实验报告
+│   ├── lesson3_training_loss.png # 训练损失图
+│   ├── lesson3_training_time_breakdown.png # 训练时间分解图
+│   └── lesson3_predictions_vs_actual.png   # 预测对比图
+├── src/
+│   ├── mlp_train_dcu.cpp       # C++实现的MLP训练与推断（DCU加速）
+│   └── performance_analysis.py # Python性能分析与可视化脚本
+├── README.md                   # 本说明文件
+└── run.sh                      # 编译和运行C++程序的便捷脚本
 ```
 
-## 编译与运行
+## 3. 环境要求
 
-### 编译
+- **C++编译器**: 支持C++17标准。推荐使用 `hipcc` 或 `g++` (例如版本9.x或更高)。
+- **Python环境**: Python 3.6+。
+    - **依赖库**: `matplotlib`, `numpy`。可以通过pip安装：
+      ```bash
+      pip install matplotlib numpy
+      ```
+- **（可选）mplfonts**: 如果需要在matplotlib图表中使用中文字体，可以安装 `mplfonts` 并进行初始化（脚本中已包含英文备选方案）。
+  ```bash
+  pip install mplfonts
+  ```
+  然后在Python脚本中：
+  ```python
+  # from mplfonts.bin.cli import init
+  # init()
+  # matplotlib.rcParams['font.family'] = 'Source Han Sans CN'
+  ```
+
+## 4. 数据说明
+
+- **`data/starlink_bw.json`**: 一个JSON文件，包含一个名为 `"bandwidth"` 的键，其值为一个表示历史带宽数据的浮点数数组。
+- **数据预处理**: C++程序会加载此数据，使用滑动窗口（大小为10）生成输入特征和目标值，然后将数据归一化到 `[0, 1]` 区间进行训练。
+
+## 5. 如何编译和运行
+
+### 5.1. 使用 `run.sh` 脚本 (推荐)
+
+`run.sh` 脚本会自动处理编译和运行步骤，并将输出重定向到日志文件。
+
+在 `lesson3` 目录下执行：
+```bash
+./run.sh
+```
+该脚本会：
+1. 优先使用 `hipcc` 编译 `src/mlp_train_dcu.cpp` 以在DCU上运行。
+2. 如果 `hipcc` 不可用，则回退到使用 `g++` 编译（此时DCU特定代码将通过宏不被编译）。
+3. 执行编译生成的可执行文件 `mlp_train_dcu`。
+4. 所有标准输出和错误输出都将保存到 `log/mlp_train_perf.log`。
+
+### 5.2. 手动编译和运行
+
+#### 编译
+
+根据你的环境选择以下命令之一，在 `lesson3` 目录下执行：
+
+- **使用g++**:
+  ```bash
+  g++ src/mlp_train_dcu.cpp -o mlp_train_dcu -std=c++17 -I./src -O2
+  ```
+- **使用hipcc (用于DCU)**:
+  ```bash
+  hipcc src/mlp_train_dcu.cpp -o mlp_train_dcu --std=c++17 -I./src -O2
+  ```
+
+#### 运行C++程序
 
 ```bash
-hipcc -O3 src/mlp_train_dcu.cpp -o mlp_train_dcu
+./mlp_train_dcu > log/mlp_train_perf.log 2>&1
 ```
-
-### 运行
-
-可以直接执行 `run.sh` 脚本来编译并运行 MLP 的训练和测试：
-
-```bash
-./lesson3/run.sh
-```
-
-该脚本会自动执行以下操作：
-*   编译 `src/mlp_train_dcu.cpp`（使用 `hipcc`）。
-*   运行 MLP 训练和测试程序。
-*   程序内部会执行数据加载、预处理、模型训练（在DCU上）、模型测试（在DCU上）。
-*   输出包括：
-    *   数据加载和预处理信息。
-    *   初始权重拷贝到DCU的耗时。
-    *   每个训练周期的平均损失和执行时间 (细分为HtoD, Kernels, DtoH时间)。
-    *   测试阶段的归一化和反归一化 MSE。
-    *   部分测试样本的预测值与真实值对比。
-*   所有输出将打印到终端，并追加到 `lesson3/log/mlp_train_perf.log` 文件中。
-
-如果 `hipcc` 编译失败或不可用，脚本会记录编译失败信息，并向日志文件中写入该DCU部分的性能占位数据。
-
-### 单独执行
-
-编译成功后，也可以直接运行可执行文件：
-
+或者，如果不重定向输出：
 ```bash
 ./mlp_train_dcu
 ```
 
-## 注意事项
+### 5.3. 运行Python分析脚本
 
-*   程序内部使用固定的超参数，如 `INPUT_DIM`, `HIDDEN_DIM`, `BATCH_SIZE`, `EPOCHS`, `LEARNING_RATE` 等，这些参数在 `mlp_train_dcu.cpp` 文件头部定义。
-*   所有与DCU相关的操作，包括内存分配、数据拷贝、核函数启动和同步，都使用HIP API。
-*   训练过程中的性能计时（每周期 HtoD, Kernels, DtoH 时间）由程序内部通过HIP事件 API测量并打印。
-*   CPU辅助函数用于数据预处理、结果验证以及在DCU无法工作时的完整CPU路径计算（但在正常DCU流程中，这些CPU函数仅用于生成参考或辅助，核心计算在DCU）。
-*   最终的性能和训练日志记录在 `lesson3/log/mlp_train_perf.log`。 
+在C++程序运行并生成 `log/mlp_train_perf.log` 后，可以运行Python脚本来生成图表：
+
+确保当前目录是 `lesson3` 或者能够正确解析脚本中的相对路径。
+从 `lesson3` 目录运行：
+```bash
+/opt/venvs/base/bin/python src/performance_analysis.py 
+```
+或者如果你的Python环境已配置好，可以直接：
+```bash
+python3 src/performance_analysis.py
+```
+脚本会将生成的图表保存在 `report/` 目录下。
+
+## 6. 输出说明
+
+- **`log/mlp_train_perf.log`**: 包含了C++程序运行时的详细输出，包括数据加载信息、每个训练epoch的性能（损失、HtoD、Kernels、DtoH时间）以及测试阶段的性能（MSE、延迟、吞吐量）和部分预测样本。
+- **`report/lesson3_training_loss.png`**: 显示训练过程中每个epoch的平均MSE损失变化。
+- **`report/lesson3_training_time_breakdown.png`**: 可视化每个训练epoch中HtoD、Kernels和DtoH时间占比。
+- **`report/lesson3_predictions_vs_actual.png`**: 展示测试集中部分样本的预测带宽值与实际带宽值的对比。
+- **`report/report.md`**: 详细的实验报告，总结了模型设计、实验设置、性能结果和分析。
+
+## 7. DCU加速说明
+
+本项目的C++代码 (`mlp_train_dcu.cpp`) 利用HIP (Heterogeneous-compute Interface for Portability) API 来实现在DCU上的加速。
+- **HIP API**: 用于管理设备内存、执行数据传输（主机与设备之间）以及启动在DCU上并行执行的计算内核。
+- **内核函数**: 特定的计算密集型操作（如矩阵运算、激活函数等）被编写为HIP内核函数，在DCU设备上由大量线程并行执行。
+- **性能计时**: 通过HIP事件API精确测量数据传输和内核执行的时间，以评估DCU加速的性能。
+
+这种方法利用了DCU的大规模并行处理能力，以加速MLP模型的训练和推断过程。
+
+## 8. 作者信息
+
+- **姓名**: 廖望
+- **学号**: 2210556 

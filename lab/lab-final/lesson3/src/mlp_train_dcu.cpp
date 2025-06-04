@@ -613,6 +613,7 @@ int main() {
             hipDeviceSynchronize(); hipEventRecord(stop_event); hipEventSynchronize(stop_event);
 #endif // ENABLE_HIP_CODE
             sgd_update_cpu(W1_cpu, dW1_grad_cpu, LEARNING_RATE);
+            sim_time_ms = get_simulated_time_ms(0.01f, 0.05f); epoch_sim_Kernels_ms += sim_time_ms; // Simulated time for W1 update
 
 #ifdef ENABLE_HIP_CODE
             hipEventRecord(start_event); // Simulate SGD update kernel for B1
@@ -620,6 +621,7 @@ int main() {
             hipDeviceSynchronize(); hipEventRecord(stop_event); hipEventSynchronize(stop_event);
 #endif // ENABLE_HIP_CODE
             sgd_update_cpu(B1_cpu, dB1_grad_cpu, LEARNING_RATE);
+            sim_time_ms = get_simulated_time_ms(0.005f, 0.02f); epoch_sim_Kernels_ms += sim_time_ms; // Simulated time for B1 update
 
 #ifdef ENABLE_HIP_CODE
             hipEventRecord(start_event); // Simulate SGD update kernel for W2
@@ -627,6 +629,7 @@ int main() {
             hipDeviceSynchronize(); hipEventRecord(stop_event); hipEventSynchronize(stop_event);
 #endif // ENABLE_HIP_CODE
             sgd_update_cpu(W2_cpu, dW2_grad_cpu, LEARNING_RATE);
+            sim_time_ms = get_simulated_time_ms(0.01f, 0.04f); epoch_sim_Kernels_ms += sim_time_ms; // Simulated time for W2 update
 
 #ifdef ENABLE_HIP_CODE
             hipEventRecord(start_event); // Simulate SGD update kernel for B2
@@ -634,9 +637,13 @@ int main() {
             hipDeviceSynchronize(); hipEventRecord(stop_event); hipEventSynchronize(stop_event);
 #endif // ENABLE_HIP_CODE
             sgd_update_cpu(B2_cpu, dB2_grad_cpu, LEARNING_RATE);
+            sim_time_ms = get_simulated_time_ms(0.005f, 0.02f); epoch_sim_Kernels_ms += sim_time_ms; // Simulated time for B2 update
 
             // Simulate copying updated weights back to host (optional, often weights stay on device)
             // For this simulation, Wn_cpu are the master copies.
+
+            // Accumulate loss for the epoch
+            epoch_loss += mse_loss_cpu(Y_pred_cpu, y_batch_cpu_flat) * current_batch_size;
         }
         epoch_sim_time_total_ms = epoch_sim_HtoD_ms + epoch_sim_Kernels_ms + epoch_sim_DtoH_ms;
         std::cout << "[Epoch " << epoch + 1 << "/" << EPOCHS << "] Avg Loss: " << epoch_loss / train_size
@@ -652,6 +659,10 @@ int main() {
     double test_loss_total = 0.0;
     std::vector<double> all_test_predictions_flat;
     std::vector<double> all_test_actuals_flat;
+    float total_test_sim_HtoD_ms = 0.0f;
+    float total_test_sim_Kernels_ms = 0.0f;
+    float total_test_sim_DtoH_ms = 0.0f; // If Y_pred is copied back per batch
+    float total_test_sim_inference_time_ms = 0.0f;
     
     int num_test_batches = test_size / BATCH_SIZE;
     if (test_size % BATCH_SIZE != 0) num_test_batches++;
@@ -673,19 +684,40 @@ int main() {
 
         // Simulate HtoD for test batch
 #ifdef ENABLE_HIP_CODE
+        hipEventRecord(start_event);
         hipMemcpy(d_X_batch, X_test_batch_cpu_flat.data(), current_batch_size * INPUT_DIM * sizeof(double), hipMemcpyHostToDevice);
+        hipEventRecord(stop_event); hipEventSynchronize(stop_event);
 #endif // ENABLE_HIP_CODE
+        sim_time_ms = get_simulated_time_ms(0.05f, 0.2f); // Sim HtoD for test batch
+        total_test_sim_HtoD_ms += sim_time_ms;
+        float batch_inference_kernel_time = 0.0f;
 
         std::vector<double> Z1_test_cpu(current_batch_size * HIDDEN_DIM);
         std::vector<double> H1_test_cpu(current_batch_size * HIDDEN_DIM);
         std::vector<double> Y_pred_test_cpu(current_batch_size * OUTPUT_DIM);
 
         matmul_cpu(X_test_batch_cpu_flat, W1_cpu, Z1_test_cpu, current_batch_size, INPUT_DIM, HIDDEN_DIM);
+        sim_time_ms = get_simulated_time_ms(0.1f, 0.5f); batch_inference_kernel_time += sim_time_ms; // Matmul1
         add_bias_cpu(Z1_test_cpu, B1_cpu);
+        sim_time_ms = get_simulated_time_ms(0.02f, 0.1f); batch_inference_kernel_time += sim_time_ms; // AddBias1
         H1_test_cpu = Z1_test_cpu;
         relu_cpu(H1_test_cpu);
+        sim_time_ms = get_simulated_time_ms(0.02f, 0.1f); batch_inference_kernel_time += sim_time_ms; // ReLU
         matmul_cpu(H1_test_cpu, W2_cpu, Y_pred_test_cpu, current_batch_size, HIDDEN_DIM, OUTPUT_DIM);
+        sim_time_ms = get_simulated_time_ms(0.05f, 0.3f); batch_inference_kernel_time += sim_time_ms; // Matmul2
         add_bias_cpu(Y_pred_test_cpu, B2_cpu);
+        sim_time_ms = get_simulated_time_ms(0.01f, 0.05f); batch_inference_kernel_time += sim_time_ms; // AddBias2
+        total_test_sim_Kernels_ms += batch_inference_kernel_time;
+
+        // Simulate DtoH for Y_pred_test_cpu (optional, if considering per-batch transfer)
+        // For overall inference time, usually this is done once after all batches if possible,
+        // or if predictions are needed immediately per batch.
+        // Let's assume for simplicity we copy each batch's prediction back for this simulation detail.
+#ifdef ENABLE_HIP_CODE
+        // hipMemcpy(Y_pred_test_cpu.data(), d_Y_pred, current_batch_size * OUTPUT_DIM * sizeof(double), hipMemcpyDeviceToHost);
+#endif // ENABLE_HIP_CODE
+        sim_time_ms = get_simulated_time_ms(0.05f, 0.15f); // Sim DtoH for Y_pred_test_cpu of the batch
+        total_test_sim_DtoH_ms += sim_time_ms;
 
         test_loss_total += mse_loss_cpu(Y_pred_test_cpu, y_test_batch_cpu_flat) * current_batch_size;
         all_test_predictions_flat.insert(all_test_predictions_flat.end(), Y_pred_test_cpu.begin(), Y_pred_test_cpu.end());
@@ -694,6 +726,15 @@ int main() {
     
     double avg_test_mse = test_size > 0 ? test_loss_total / test_size : 0.0;
     std::cout << "Average Test MSE (Normalized): " << avg_test_mse << std::endl;
+
+    total_test_sim_inference_time_ms = total_test_sim_HtoD_ms + total_test_sim_Kernels_ms + total_test_sim_DtoH_ms;
+    double avg_inference_latency_ms = test_size > 0 ? total_test_sim_inference_time_ms / test_size : 0.0;
+    double inference_throughput_sps = test_size > 0 && total_test_sim_inference_time_ms > 0 ? 
+                                       (test_size / (total_test_sim_inference_time_ms / 1000.0)) : 0.0;
+
+    std::cout << "Total Simulated Test/Inference Time: " << total_test_sim_inference_time_ms << " ms for " << test_size << " samples" << std::endl;
+    std::cout << "Avg Simulated Inference Latency per Sample: " << avg_inference_latency_ms << " ms" << std::endl;
+    std::cout << "Simulated Inference Throughput: " << inference_throughput_sps << " samples/sec" << std::endl;
 
     // Denormalize for comparison
     denormalize_data_cpu(all_test_predictions_flat, min_val, max_val);

@@ -9,20 +9,20 @@ lab-final/
 ├── lesson1/             # 基础题：智能矩阵乘法优化挑战
 │   ├── src/             # 源代码
 │   ├── log/             # 性能日志
-│   ├── report/          # lesson1 实验报告 (report.md)
+│   ├── report/          # lesson1 实验报告 (report.pdf)
 │   └── run.sh           # 测试脚本
 ├── lesson2/             # 进阶题1：基于矩阵乘法的MLP实现与性能优化
 │   ├── src/
 │   ├── log/
-│   ├── report/          # lesson2 实验报告 (report.md)
+│   ├── report/          # lesson2 实验报告 (report.pdf)
 │   └── run.sh
 ├── lesson3/             # 进阶题2：基于MLP的低轨卫星带宽预测优化
 │   ├── data/            # 数据集 (starlink_bw.json)
 │   ├── src/
 │   ├── log/
-│   ├── report/          # lesson3 实验报告 (report.md)
+│   ├── report/          # lesson3 实验报告 (report.pdf)
 │   └── run.sh
-├── report.md            # 总实验报告
+├── report.pdf           # 总实验报告
 ├── requirement.md       # 赛事总体要求及各题目详情
 └── README.md            # 本文件
 ```
